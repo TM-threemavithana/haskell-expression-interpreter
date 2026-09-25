@@ -1,0 +1,46 @@
+# Haskell build products
+*.hi
+*.o
+*.dyn_hi
+*.dyn_o
+*.hie
+*.exe
+*.prof
+*.hp
+*.eventlog
+dist/
+dist-newstyle/
+.stack-work/
+.ghc.environment.*
+/Main
+/examples/Main
+
+# Local documents and coursework are not part of this public-facing copy
+*.docx
+*.pdf
+/report.md
+/EC8206_Project_Assignment*
+/private/
+/submission/
+/output/
+/media/
+/tmp/
+
+# Backups, editors, and operating systems
+*.orig
+*.bak
+*~
+*.swp
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local credentials and environments
+.env
+.env.*
+*.pem
+*.key
+__pycache__/
+.venv/

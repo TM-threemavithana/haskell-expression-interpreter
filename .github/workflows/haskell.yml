@@ -1,0 +1,39 @@
+name: Haskell checks
+
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: GHC 9.10.3 on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up GHC
+        uses: haskell-actions/setup@7fd2bb5ca789761088fbc831406b2910e47e56f1 # v2
+        with:
+          ghc-version: '9.10.3'
+          cabal-update: false
+
+      - name: Compile interpreter with warnings as errors
+        run: ghc -Wall -Werror -fno-code Expr.hs
+
+      - name: Run regression tests
+        run: ghci -v0 Expr.hs -e runTests
+
+      - name: Compile demonstration with warnings as errors
+        run: ghc -Wall -Werror -fno-code Expr.hs examples/Main.hs
+
+      - name: Run demonstration
+        run: ghci -v0 Expr.hs examples/Main.hs -e Main.main
