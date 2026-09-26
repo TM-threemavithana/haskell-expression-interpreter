@@ -115,7 +115,6 @@ Two bounded checks examine 5,766 generated trees for simplifier idempotence and 
 - [Expr.hs](Expr.hs) — interpreter, simplifier, batch functions, and tests.
 - [examples/Main.hs](examples/Main.hs) — runnable demonstration.
 - [.github/workflows/haskell.yml](.github/workflows/haskell.yml) — automated checks.
-- [docs/PUBLISHING.md](docs/PUBLISHING.md) — first-push checklist and instructions.
 
 The coursework report and supplied assignment brief are deliberately not included. They remain in the original local project folder.
 
