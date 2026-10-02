@@ -12,7 +12,7 @@ The implementation uses only GHC's `base` library. No extra Haskell packages, AP
 - Eight algebraic simplification rules.
 - Batch evaluation with `map` and `mapMaybe`, and success/failure counting with `foldr`.
 - Fully parenthesized expression printing.
-- 57 automated checks, including bounded checks over 5,766 generated expression trees.
+- 76 automated checks, including bounded checks over 12,210 generated expression-tree cases.
 
 ## Quick start
 
@@ -28,7 +28,8 @@ ghci -v0 Expr.hs -e runTests
 Expected final test output:
 
 ```text
-57 passed; 0 failed.
+Generated trees checked: 12210
+76 passed; 0 failed.
 ```
 
 The test command returns a nonzero exit status if a check fails.
@@ -104,9 +105,9 @@ These trade-offs are documented and tested. Do not simplify before evaluation if
 
 ## Tests and automation
 
-Tests cover every expression constructor, error propagation, shadowing, nonrecursive binding scope, all eight rewrite rules, nested simplification, batch operations, and selected pretty-printing and floating-point cases.
+Tests cover every expression constructor, error propagation, shadowing, nonrecursive binding scope, all eight rewrite rules, nested simplification, batch operations, and selected pretty-printing and floating-point cases. Printing regressions explicitly check NaN, positive and negative infinity, and both signs of zero in both printing functions.
 
-Two bounded checks examine 5,766 generated trees for simplifier idempotence and batch consistency. This is not exhaustive verification or a proof of correctness.
+Two bounded checks examine 12,210 generated expression-tree cases for simplifier idempotence and batch consistency. The cases include left- and right-nested operators, nested binding values and bodies, and shadowed names; cases are not necessarily distinct trees. Separate batch fixtures use hand-calculated per-expression results, successful values, and success/failure counts, so agreement between the batch functions is not the only evidence. This is not exhaustive verification or a proof of correctness.
 
 [The GitHub Actions workflow](.github/workflows/haskell.yml) checks compilation, runs all tests, and runs the demo on Linux and Windows with GHC 9.10.3. Its hosted result is available only after the repository is pushed and the workflow runs.
 

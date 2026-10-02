@@ -2,7 +2,6 @@
 -- EC 8206 -- Functional Programming
 -- Project Assignment: Arithmetic Expression Interpreter
 -- University of Ruhuna
--- OpenAI Codex assisted with code and test revisions.
 -- ============================================================
 
 {-# OPTIONS_GHC -Wall #-}
@@ -86,7 +85,7 @@ applyOp op env e1 e2 = do
 -- ============================================================
 
 -- | Simplify an expression by rewriting algebraic identities.
---   Implements 8 rewrites (minimum required: 3). Subexpressions are
+--   Implements eight algebraic rewrites. Subexpressions are
 --   simplified before the enclosing rule is selected, so one call reaches
 --   a fixed point for the identities below on finite expression trees.
 --   These are algebraic rewrites, not a semantics-preserving optimizer:
@@ -120,8 +119,9 @@ simplify (Let x e1 e2) = Let x (simplify e1) (simplify e2)
 
 
 -- | Evaluate a batch of expressions. Returns only the successful results.
---   Uses partial application: (eval env) is partially applied to map.
---   mapMaybe discards Left results and unwraps Right ones.
+--   map applies the partially applied function eval env to each expression.
+--   toRight converts successes to Just and failures to Nothing;
+--   mapMaybe keeps the successful values.
 evalBatch :: Env -> [Expr] -> [Double]
 evalBatch env exprs = mapMaybe toRight (map (eval env) exprs)
   where
@@ -171,6 +171,8 @@ runTests = do
   putStrLn "EC8206 Expression Interpreter Tests"
   evaluations <- mapM runEvaluation evaluationCases
   rewrites <- mapM runRewrite simplificationCases
+  printing <- fmap concat (mapM runPrinting printingCases)
+  batches <- fmap concat (mapM runBatch batchCases)
   extras <- sequence
     [ check "evalBatch keeps successes in order"
         (evalBatch sampleEnv batch) [1, 3, 9]
@@ -230,22 +232,95 @@ runTests = do
         (length (evalBatch sampleEnv trees),
          length trees - length (evalBatch sampleEnv trees))
     ]
-  finishTests (evaluations ++ rewrites ++ extras)
+  putStrLn $ "Generated trees checked: " ++ show (length trees)
+  finishTests (evaluations ++ rewrites ++ printing ++ batches ++ extras)
   where
     runEvaluation (name, expression, expected) =
       check name (eval sampleEnv expression) expected
     runRewrite (name, expression, expected) =
       check ("simplify " ++ name) (simplify expression) expected
+    runPrinting (name, value, expected) = sequence
+      [ check ("pretty " ++ name) (prettyExpr (Lit value)) expected
+      , check ("showResult " ++ name) (showResult (Right value)) ("= " ++ expected)
+      ]
+    runBatch (name, expressions, expectedResults, expectedValues, expectedCounts) =
+      sequence
+        [ check ("batch evaluations: " ++ name)
+            (map (eval sampleEnv) expressions) expectedResults
+        , check ("batch values: " ++ name)
+            (evalBatch sampleEnv expressions) expectedValues
+        , check ("batch counts: " ++ name)
+            (countResults sampleEnv expressions) expectedCounts
+        ]
+    -- Literal expected strings catch formatting regressions independently of show.
+    printingCases =
+      [ ("NaN", nan, "NaN")
+      , ("positive infinity", infinity, "Infinity")
+      , ("negative infinity", negate infinity, "-Infinity")
+      , ("positive zero", 0.0, "0.0")
+      , ("negative zero", -0.0, "-0.0")
+      ]
+    -- Hand-calculated results: none of these expectations comes from eval,
+    -- evalBatch, countResults, or another function under test.
+    batchCases =
+      [ ( "mixed signs, fractions, duplicates, and failures"
+        , [ Lit (-2), Div (Lit 9) (Lit 2), badDivision, Lit 0
+          , Add (Var "x") (Lit 1), Var "missing", Lit (-2)
+          ]
+        , [ Right (-2), Right 4.5, Left "Division by zero", Right 0
+          , Right 4, Left "Undefined variable: missing", Right (-2)
+          ]
+        , [-2, 4.5, 0, 4, -2]
+        , (5, 2)
+        )
+      , ( "nested binding values, shadowing, and scope isolation"
+        , [ Let "x" (Let "y" (Lit 2) (Add (Var "y") (Lit 1)))
+              (Add (Var "x") (Var "y"))
+          , Let "x" (Lit 10) (Let "x" (Add (Var "x") (Lit 1)) (Var "x"))
+          , Add (Let "x" (Lit 2) (Var "x")) (Var "x")
+          , Var "x"
+          ]
+        , [Right 7, Right 11, Right 5, Right 3]
+        , [7, 11, 5, 3]
+        , (4, 0)
+        )
+      , ( "binding errors, error precedence, and recovery"
+        , [ Let "x" (Var "missing") (Lit 1)
+          , Let "x" (Lit 1) badDivision
+          , Div (Var "missing") (Lit 0)
+          , Lit 8
+          ]
+        , [ Left "Undefined variable: missing", Left "Division by zero"
+          , Left "Undefined variable: missing", Right 8
+          ]
+        , [8]
+        , (1, 3)
+        )
+      ]
     badDivision = Div (Lit 1) (Lit 0)
     batch = [Lit 1, badDivision, Var "x", Var "w", Lit 9]
     atoms = [Lit (-1), Lit 0, Lit 1, Lit 2, Var "x", Var "missing"]
     shallowTrees = atoms
       ++ [op a b | op <- [Add, Sub, Mul, Div], a <- atoms, b <- atoms]
       ++ [Let "x" a b | a <- atoms, b <- atoms]
-    -- 5,766 deterministic trees, including nested operators and Let scopes.
+    -- 12,210 deterministic cases (not necessarily distinct trees).
+    -- Includes left- and right-nested operators and nested Let bindings
+    -- in initializers and bodies, with distinct and shadowed names.
     trees = shallowTrees
       ++ [op a b | op <- [Add, Sub, Mul, Div], a <- shallowTrees, b <- atoms]
       ++ [Let "x" a b | a <- shallowTrees, b <- atoms]
+      ++ [op a b | op <- [Add, Sub, Mul, Div], a <- atoms, b <- shallowTrees]
+      ++ [Let "x" a b | a <- atoms, b <- shallowTrees]
+      ++ [ Let outer (Let inner value (Add (Var inner) delta))
+             (Add (Var outer) body)
+         | (outer, inner) <- [("x", "y"), ("x", "x")]
+         , value <- atoms, delta <- atoms, body <- atoms
+         ]
+      ++ [ Let outer value
+             (Let inner (Add (Var outer) delta) (Add (Var inner) body))
+         | (outer, inner) <- [("x", "y"), ("x", "x")]
+         , value <- atoms, delta <- atoms, body <- atoms
+         ]
     nan = 0 / 0
     infinity = 1 / 0
     signedZeroSum = Add (Lit (-0.0)) (Lit 0)
